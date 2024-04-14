@@ -285,6 +285,3 @@ gr.Interface(generatee, "textbox", "textbox", title="GPT").launch()
 # #open('more.txt', 'w').write(decode(m.generate(context, max_new_tokens=10000)[0].tolist()))
 
 
-
-#task to complete random badiya sa data dhundna hai ....model ka ek pre-trained version banana haiii.....if possible 
-#task - create a language generator given a input text --- it will give you related output
