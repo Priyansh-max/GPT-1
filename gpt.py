@@ -43,7 +43,7 @@ itos = { i:ch for i,ch in enumerate(chars) }
 encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
 decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
 
-#*******************************************************************************************************************************
+#**************************************************************************************************************************
 #problem with using BPE encoding
 # torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.54 GiB. GPU 0 has a total capacity of 4.00 GiB of which 0 bytes is free. 
 # Of the allocated memory 5.00 GiB is allocated by PyTorch, and 1.34 GiB is reserved by PyTorch but unallocated. If reserved but 
