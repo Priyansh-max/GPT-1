@@ -18,38 +18,24 @@ n_embd = 192 #d-model ....in class we took 786 in case of gpt
 n_head = 3 #no-of-multiheads ........... class me 12 liya tha
 n_layer = 3 #no-of-decoder layers ............... original 12 hote hai ..... yaha pe compute ke liye 6 liye hai
 dropout = 0.2
-# ------------
 
 torch.manual_seed(1337)
 
 df = pd.read_csv("text.csv")
 text = df["text"].str.cat(sep="\n")
-print(len(text))
-
-print("hiiiiiiiiiiiiiiiiiiiiiii")
-
-# # wget https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt
-# with open('input.txt', 'r', encoding='utf-8') as f:
-#     text = f.read()
+print("Length of text : ",len(text))
 
 # here are all the unique characters that occur in this text
 chars = sorted(list(set(text)))
 vocab_size = len(chars)
-print(vocab_size)
+print("Size of vocab : ",vocab_size)
 
+#char level encoding
 # create a mapping from characters to integers
 stoi = { ch:i for i,ch in enumerate(chars) }
 itos = { i:ch for i,ch in enumerate(chars) }
 encode = lambda s: [stoi[c] for c in s] # encoder: take a string, output a list of integers
 decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integers, output a string
-
-#**************************************************************************************************************************
-#problem with using BPE encoding
-# torch.cuda.OutOfMemoryError: CUDA out of memory. Tried to allocate 1.54 GiB. GPU 0 has a total capacity of 4.00 GiB of which 0 bytes is free. 
-# Of the allocated memory 5.00 GiB is allocated by PyTorch, and 1.34 GiB is reserved by PyTorch but unallocated. If reserved but 
-# unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True 
-# to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
-
 
 # using BPE will give you large vocab size with smaller sequence length *********************************IMP
 """FOR OUR EXAMPLE USING TIKTOKEN BPE encoding 
@@ -71,7 +57,66 @@ decode = lambda l: ''.join([itos[i] for i in l]) # decoder: take a list of integ
 # print(vocab_size)
 
 # Train and test splits
-data = torch.tensor(encode(text), dtype=torch.long)
+# data = torch.tensor(encode(text), dtype=torch.long) 
+
+#encoding of my data -- string to integer --on character level with vocab size of 65
+"""here vocab size is 28 hence each and every character in my text will be encoding to an integer
+between 0 to 27"""
+# print(data.shape) #encoding the text -- each character to an integer value between 0 to 28
+
+# *****************************************************implementation of BPE*******************************************************
+
+data = list(encode(text))
+counts = {}
+def get_stats(ids):
+    counts = {}
+    for pair in zip(ids, ids[1:]): # Pythonic way to iterate consecutive elements
+        counts[pair] = counts.get(pair, 0) + 1
+    return counts
+
+def merge(ids, pair, idx):
+  # in the list of ints (ids), replace all consecutive occurences of pair with the new token idx
+  newids = []
+  i = 0
+  while i < len(ids):
+    # if we are not at the very last position AND the pair matches, replace it
+    if i < len(ids) - 1 and ids[i] == pair[0] and ids[i+1] == pair[1]:
+      newids.append(idx)
+      i += 2
+    else:
+      newids.append(ids[i])
+      i += 1
+  return newids
+
+max_vocab = 50 
+vocab_size = max_vocab
+print(f"size of vocab {vocab_size}")
+num_merges = max_vocab - 28
+new_list = list(data)
+
+merges = {}
+for i in range(num_merges):
+    new_count = get_stats(new_list)
+    pair = max(new_count , key=new_count.get)
+    idx = 28 + i
+    print(f"merging {pair} into a new token {idx}")
+    new_list = merge(new_list , pair , idx)
+    merges[pair] = idx
+    
+for key, value in merges.items():
+    var1 , var2 = key
+    new_var1 = decode([var1])
+    new_var2 = decode([var2])
+    new_idx = new_var1+new_var2
+    itos[value] = new_idx
+    
+data = list(new_list)
+data = torch.tensor(data, dtype=torch.long)
+
+# *****************************************************implementation of BPE*******************************************************
+
+
+
 n = int(0.9*len(data)) # first 90% will be train, rest val
 train_data = data[:n]
 val_data = data[n:]
@@ -79,11 +124,32 @@ val_data = data[n:]
 # data loading
 def get_batch(split):
     # generate a small batch of data of inputs x and targets y
-    data = train_data if split == 'train' else val_data
-    ix = torch.randint(len(data) - block_size, (batch_size,))
-    x = torch.stack([data[i:i+block_size] for i in ix])
-    y = torch.stack([data[i+1:i+block_size+1] for i in ix])
-    x, y = x.to(device), y.to(device)
+    # Selecting data based on split
+    if split == 'train':
+        data = train_data
+    else:
+        data = val_data
+
+    # Randomly selecting starting indices for sequences
+    indices = torch.randint(len(data) - block_size, (batch_size,))
+    # Creating input sequences (x) and target sequences (y)
+    x_sequences = []
+    y_sequences = []
+    for i in indices:
+        x_seq = data[i:i+block_size]
+        y_seq = data[i+1:i+block_size+1]
+        
+        x_sequences.append(x_seq)
+        y_sequences.append(y_seq)
+
+    x = torch.stack(x_sequences)
+    y = torch.stack(y_sequences)
+
+    # Moving data to the appropriate device (e.g., GPU)
+    x = x.to(device)
+    y = y.to(device)
+
+    # Returning input and target sequences
     return x, y
 
 @torch.no_grad()
